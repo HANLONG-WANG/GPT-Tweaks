@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GPT Tweaks",
-  "version": "0.1.0",
-  "description": "在 ChatGPT 网页版中使用 Ctrl+Enter 发送消息，Enter 仅用于换行。",
+  "version": "0.2.0",
+  "description": "为 ChatGPT 网页版提供 Ctrl+Enter 发送与 Markdown 列表自动续写。",
   "content_scripts": [
     {
       "matches": [
