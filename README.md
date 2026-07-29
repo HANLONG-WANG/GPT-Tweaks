@@ -52,9 +52,10 @@
 
 ## 实现说明
 
-- 扩展仅在 `chatgpt.com` 和旧版 `chat.openai.com` 域名下注入脚本。
+- 扩展仅在 `chatgpt.com` 域名下注入脚本。
 - 在键盘事件的捕获阶段拦截 ChatGPT 的默认发送行为。
-- 优先使用 ChatGPT 的 `#prompt-textarea` 与 `data-testid="send-button"` 定位元素，不依赖随机生成的 CSS 类名。
+- 普通 `Enter` 会被转换为 `Shift+Enter`，复用 ChatGPT 编辑器原生的换行逻辑，不直接修改输入框 DOM。
+- 使用 ChatGPT 的 `#prompt-textarea` 与 `data-testid="send-button"` 定位元素，不依赖随机生成的 CSS 类名。
 - 扩展不申请额外权限，不读取或保存对话内容，也不会向第三方发送数据。
 
 如果 ChatGPT 后续修改输入框或发送按钮的页面结构，相关选择器可能需要同步更新。

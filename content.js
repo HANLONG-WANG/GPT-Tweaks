@@ -1,13 +1,8 @@
 (() => {
   "use strict";
 
-  const EDITOR_SELECTOR = [
-    "#prompt-textarea",
-    "textarea[data-id='root']",
-    "[contenteditable='true'][role='textbox']"
-  ].join(",");
-
   const SEND_BUTTON_SELECTOR = "button[data-testid='send-button']";
+  const REDISPATCHED_EVENTS = new WeakSet();
 
   /**
    * Locate the ChatGPT composer without depending on generated CSS classes.
@@ -16,128 +11,34 @@
    * @returns {HTMLElement | null}
    */
   function findComposerEditor(event) {
-    const eventPath =
-      typeof event.composedPath === "function"
-        ? event.composedPath()
-        : [event.target];
-
-    for (const node of eventPath) {
-      if (!(node instanceof Element)) {
-        continue;
-      }
-
-      const editor = node.matches(EDITOR_SELECTOR)
-        ? node
-        : node.closest(EDITOR_SELECTOR);
-
-      if (!(editor instanceof HTMLElement)) {
-        continue;
-      }
-
-      if (editor.id === "prompt-textarea") {
-        return editor;
-      }
-
-      const form = editor.closest("form");
-      if (form?.querySelector(SEND_BUTTON_SELECTOR)) {
-        return editor;
-      }
+    if (!(event.target instanceof Element)) {
+      return null;
     }
 
-    return null;
+    return event.target.closest("#prompt-textarea");
   }
 
   /**
-   * Dispatch an input event after a manual editor update.
+   * Re-dispatch Enter as Shift+Enter so ChatGPT's own editor performs its
+   * native newline action. This avoids mutating ProseMirror's DOM directly.
    *
    * @param {HTMLElement} editor
+   * @param {KeyboardEvent} sourceEvent
    */
-  function dispatchInputEvent(editor) {
-    let inputEvent;
+  function dispatchNativeLineBreak(editor, sourceEvent) {
+    const shiftEnterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: sourceEvent.code || "Enter",
+      location: sourceEvent.location,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      shiftKey: true,
+      repeat: sourceEvent.repeat
+    });
 
-    try {
-      inputEvent = new InputEvent("input", {
-        bubbles: true,
-        composed: true,
-        inputType: "insertLineBreak",
-        data: null
-      });
-    } catch {
-      inputEvent = new Event("input", {
-        bubbles: true,
-        composed: true
-      });
-    }
-
-    editor.dispatchEvent(inputEvent);
-  }
-
-  /**
-   * Insert a newline into a textarea while preserving its selection.
-   *
-   * @param {HTMLTextAreaElement} editor
-   */
-  function insertTextareaLineBreak(editor) {
-    const start = editor.selectionStart ?? editor.value.length;
-    const end = editor.selectionEnd ?? start;
-
-    editor.setRangeText("\n", start, end, "end");
-    dispatchInputEvent(editor);
-  }
-
-  /**
-   * Fallback for contenteditable editors where execCommand is unavailable.
-   *
-   * @param {HTMLElement} editor
-   */
-  function insertContentEditableLineBreakFallback(editor) {
-    const selection = window.getSelection();
-    if (!selection) {
-      return;
-    }
-
-    if (
-      selection.rangeCount === 0 ||
-      !editor.contains(selection.getRangeAt(0).commonAncestorContainer)
-    ) {
-      const endRange = document.createRange();
-      endRange.selectNodeContents(editor);
-      endRange.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(endRange);
-    }
-
-    const range = selection.getRangeAt(0);
-    const lineBreak = document.createElement("br");
-
-    range.deleteContents();
-    range.insertNode(lineBreak);
-    range.setStartAfter(lineBreak);
-    range.collapse(true);
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-    dispatchInputEvent(editor);
-  }
-
-  /**
-   * Insert a newline and notify ChatGPT's editor state.
-   *
-   * @param {HTMLElement} editor
-   */
-  function insertLineBreak(editor) {
-    editor.focus();
-
-    if (editor instanceof HTMLTextAreaElement) {
-      insertTextareaLineBreak(editor);
-      return;
-    }
-
-    if (document.execCommand("insertLineBreak", false)) {
-      return;
-    }
-
-    insertContentEditableLineBreakFallback(editor);
+    REDISPATCHED_EVENTS.add(shiftEnterEvent);
+    editor.dispatchEvent(shiftEnterEvent);
   }
 
   /**
@@ -147,9 +48,7 @@
    */
   function sendMessage(editor) {
     const form = editor.closest("form");
-    const sendButton =
-      form?.querySelector(SEND_BUTTON_SELECTOR) ??
-      document.querySelector(SEND_BUTTON_SELECTOR);
+    const sendButton = form?.querySelector(SEND_BUTTON_SELECTOR);
 
     if (
       !(sendButton instanceof HTMLButtonElement) ||
@@ -170,6 +69,7 @@
    */
   function handleKeydown(event) {
     if (
+      REDISPATCHED_EVENTS.has(event) ||
       event.key !== "Enter" ||
       event.isComposing ||
       event.keyCode === 229
@@ -205,10 +105,10 @@
     }
 
     // Block every other Enter combination from reaching ChatGPT's send
-    // handler and insert a newline instead.
+    // handler, then reuse ChatGPT's native Shift+Enter newline behavior.
     event.preventDefault();
     event.stopImmediatePropagation();
-    insertLineBreak(editor);
+    dispatchNativeLineBreak(editor, event);
   }
 
   document.addEventListener("keydown", handleKeydown, true);
