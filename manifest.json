@@ -1,15 +1,36 @@
 {
   "manifest_version": 3,
   "name": "GPT Tweaks",
-  "version": "0.2.0",
-  "description": "为 ChatGPT 网页版提供 Ctrl+Enter 发送与 Markdown 列表自动续写。",
+  "version": "0.4.0",
+  "description": "为 ChatGPT 网页版提供快捷发送、列表续写与对话节点导航。",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_title": "GPT Tweaks 设置",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
     {
       "matches": [
         "https://chatgpt.com/*"
       ],
       "js": [
-        "content.js"
+        "navigation-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content.js",
+        "navigation.js"
+      ],
+      "css": [
+        "navigation.css"
       ],
       "run_at": "document_start"
     }

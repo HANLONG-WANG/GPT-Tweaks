@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>GPT Tweaks 设置</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>GPT Tweaks</h1>
+
+      <label for="history-limit">对话导航历史范围</label>
+      <select id="history-limit">
+        <option value="auto">自动（最多 100 条）</option>
+        <option value="25">最近 25 条</option>
+        <option value="50">最近 50 条</option>
+        <option value="100">最近 100 条</option>
+        <option value="all">全部</option>
+      </select>
+
+      <p>
+        此设置只控制导航节点数量。对话正文仍由 ChatGPT
+        按需加载，以免长对话占用过多资源。
+      </p>
+      <div id="status" role="status" aria-live="polite"></div>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
