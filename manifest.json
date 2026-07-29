@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GPT Tweaks",
-  "version": "0.4.0",
-  "description": "为 ChatGPT 网页版提供快捷发送、列表续写与对话节点导航。",
+  "version": "0.8.1",
+  "description": "为 ChatGPT 网页版提供快捷发送、列表续写与缩进、对话节点导航。",
   "permissions": [
     "storage"
   ],
