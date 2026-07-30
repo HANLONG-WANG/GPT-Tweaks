@@ -14,6 +14,9 @@
   const SEND_BUTTON_SELECTOR = "button[data-testid='send-button']";
   const PENDING_LIST_EXITS = new WeakMap();
   const REDISPATCHED_EVENTS = new WeakSet();
+  const IS_MAC_OS =
+    navigator.userAgentData?.platform === "macOS" ||
+    /Mac/i.test(navigator.platform);
 
   /**
    * Locate the ChatGPT composer without depending on generated CSS classes.
@@ -791,10 +794,11 @@
     }
 
     const isSendShortcut =
-      event.ctrlKey &&
       !event.altKey &&
-      !event.metaKey &&
-      !event.shiftKey;
+      !event.shiftKey &&
+      (IS_MAC_OS
+        ? event.metaKey && !event.ctrlKey
+        : event.ctrlKey && !event.metaKey);
 
     if (isSendShortcut) {
       event.preventDefault();

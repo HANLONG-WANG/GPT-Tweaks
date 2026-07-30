@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GPT Tweaks",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "为 ChatGPT 网页版提供快捷发送、列表续写与缩进、对话节点导航和 Markdown 导出。",
   "permissions": [
     "activeTab",
