@@ -3,27 +3,149 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
-    <title>GPT Tweaks 设置</title>
+    <title>GPT Tweaks 设置与导出</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
       <h1>GPT Tweaks</h1>
 
-      <label for="history-limit">对话导航历史范围</label>
-      <select id="history-limit">
-        <option value="auto">自动（最多 100 条）</option>
-        <option value="25">最近 25 条</option>
-        <option value="50">最近 50 条</option>
-        <option value="100">最近 100 条</option>
-        <option value="all">全部</option>
-      </select>
+      <section aria-labelledby="navigation-heading">
+        <h2 id="navigation-heading">对话导航</h2>
 
-      <p>
-        此设置只控制导航节点数量。对话正文仍由 ChatGPT
-        按需加载，以免长对话占用过多资源。
-      </p>
-      <div id="status" role="status" aria-live="polite"></div>
+        <label class="field-label" for="history-limit">
+          历史范围
+        </label>
+        <select id="history-limit">
+          <option value="auto">自动（最多 100 条）</option>
+          <option value="25">最近 25 条</option>
+          <option value="50">最近 50 条</option>
+          <option value="100">最近 100 条</option>
+          <option value="all">全部</option>
+        </select>
+
+        <p>
+          此设置只控制导航节点数量。对话正文仍由 ChatGPT
+          按需加载，以免长对话占用过多资源。
+        </p>
+        <div
+          id="status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></div>
+      </section>
+
+      <section
+        class="export-section"
+        aria-labelledby="export-heading"
+      >
+        <h2 id="export-heading">导出对话</h2>
+
+        <div
+          id="export-loading"
+          class="export-message"
+          role="status"
+        >
+          正在读取当前 Session…
+        </div>
+
+        <div id="export-controls" hidden>
+          <div id="session-title" class="session-title"></div>
+
+          <fieldset class="mode-fieldset">
+            <legend>导出范围</legend>
+
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="export-mode"
+                value="all"
+                checked
+              >
+              <span>本 Session 全部对话</span>
+            </label>
+
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="export-mode"
+                value="selected"
+              >
+              <span>选择轮次</span>
+            </label>
+          </fieldset>
+
+          <div id="round-selection" class="round-selection" hidden>
+            <div class="selection-toolbar">
+              <span id="selection-count">已选择 0 轮</span>
+              <span>
+                <button id="select-all" type="button">全选</button>
+                <button id="select-none" type="button">清空</button>
+              </span>
+            </div>
+            <div
+              id="round-list"
+              class="round-list"
+              role="group"
+              aria-label="选择要导出的对话轮次"
+            ></div>
+          </div>
+
+          <fieldset class="content-fieldset">
+            <legend>附加内容</legend>
+
+            <label class="choice-row">
+              <input id="include-system" type="checkbox">
+              <span>System 消息</span>
+            </label>
+            <label class="choice-row">
+              <input id="include-tool" type="checkbox">
+              <span>Tool 与代码执行消息</span>
+            </label>
+            <label class="choice-row">
+              <input id="include-thoughts" type="checkbox">
+              <span>Thoughts</span>
+            </label>
+            <label class="choice-row">
+              <input id="include-reasoning" type="checkbox">
+              <span>Reasoning / reasoning recap</span>
+            </label>
+            <label class="choice-row">
+              <input id="include-hidden" type="checkbox">
+              <span>隐藏消息</span>
+            </label>
+            <label class="choice-row">
+              <input id="include-other" type="checkbox">
+              <span>其他内部消息</span>
+            </label>
+
+            <p class="option-help">
+              用户消息和最终 AI 回复始终包含。隐藏内容还需要同时勾选其所属类型。
+            </p>
+          </fieldset>
+
+          <div class="export-actions">
+            <button id="copy-export" type="button">
+              复制
+            </button>
+            <button
+              id="download-export"
+              class="primary-action"
+              type="button"
+            >
+              下载 Markdown
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="export-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></div>
+      </section>
     </main>
 
     <script src="popup.js"></script>

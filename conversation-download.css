@@ -1,0 +1,94 @@
+#gpt-tweaks-reply-download-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 132px;
+  padding: 5px;
+  border: 1px solid
+    color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 12px;
+  background: var(--main-surface-primary, #fff);
+  color: var(--text-primary, #0d0d0d);
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 16%),
+    0 2px 8px rgb(0 0 0 / 8%);
+}
+
+#gpt-tweaks-reply-download-menu[hidden] {
+  display: none;
+}
+
+#gpt-tweaks-reply-download-menu > button {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#gpt-tweaks-reply-download-menu > button:hover,
+#gpt-tweaks-reply-download-menu > button:focus-visible {
+  background: color-mix(
+    in srgb,
+    currentColor 8%,
+    transparent
+  );
+}
+
+#gpt-tweaks-reply-download-menu > button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+#gpt-tweaks-reply-download-menu > button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+#gpt-tweaks-download-toast {
+  position: fixed;
+  inset-inline-start: 50%;
+  bottom: 28px;
+  z-index: 10001;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 9px 13px;
+  border: 1px solid
+    color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 10px;
+  background: var(--main-surface-primary, #fff);
+  color: var(--text-primary, #0d0d0d);
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 16%),
+    0 2px 8px rgb(0 0 0 / 8%);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+#gpt-tweaks-download-toast[hidden] {
+  display: none;
+}
+
+#gpt-tweaks-download-toast[data-type="error"] {
+  color: var(--text-error, #d00e17);
+}
+
+@media (prefers-color-scheme: dark) {
+  #gpt-tweaks-reply-download-menu,
+  #gpt-tweaks-download-toast {
+    background: var(--main-surface-primary, #353535);
+    color: var(--text-primary, #f2f2f2);
+  }
+}
