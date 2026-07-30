@@ -3,7 +3,9 @@
 
   const DATA_EVENT = "gpt-tweaks:conversation-data";
   const COPY_BUTTON_SELECTOR =
+    'section[data-turn="assistant"] ' +
     'button[data-testid="copy-turn-action-button"], ' +
+    'section[data-turn="assistant"] ' +
     'button[aria-label="复制回复"]';
   const MENU_ID = "gpt-tweaks-reply-download-menu";
   const TOAST_ID = "gpt-tweaks-download-toast";
@@ -40,7 +42,11 @@
    * @returns {string}
    */
   function getRouteConversationId() {
-    return location.pathname.match(/^\/c\/([^/]+)/)?.[1] ?? "";
+    return (
+      location.pathname.match(
+        /(?:^|\/)c\/([^/]+)(?:\/|$)/
+      )?.[1] ?? ""
+    );
   }
 
   /**
@@ -578,13 +584,12 @@
       closeMenu();
     }
 
-    if (!routeConversationId) {
-      closeMenu();
-      return;
-    }
-
     if (menuTarget && !document.contains(menuTarget)) {
       closeMenu();
+    }
+
+    if (!routeConversationId) {
+      return;
     }
 
     const sections = [
@@ -667,6 +672,49 @@
   function scheduleRenderedScan() {
     if (!scanFrame) {
       scanFrame = requestAnimationFrame(scanRenderedTurns);
+    }
+  }
+
+  /**
+   * Ignore unrelated portal, tooltip and page-shell mutations. Only rendered
+   * conversation turns can change the DOM fallback snapshot or invalidate an
+   * open reply menu target.
+   *
+   * @param {MutationRecord} mutation
+   * @returns {boolean}
+   */
+  function mutationTouchesRenderedTurn(mutation) {
+    const target =
+      mutation.target instanceof Element
+        ? mutation.target
+        : mutation.target.parentElement;
+
+    if (target?.closest("section[data-turn]")) {
+      return true;
+    }
+
+    if (mutation.type !== "childList") {
+      return false;
+    }
+
+    return [
+      ...mutation.addedNodes,
+      ...mutation.removedNodes
+    ].some(node =>
+      node instanceof Element &&
+      (
+        node.matches("section[data-turn]") ||
+        Boolean(node.querySelector("section[data-turn]"))
+      )
+    );
+  }
+
+  /**
+   * @param {Array<MutationRecord>} mutations
+   */
+  function handlePageMutations(mutations) {
+    if (mutations.some(mutationTouchesRenderedTurn)) {
+      scheduleRenderedScan();
     }
   }
 
@@ -1604,7 +1652,7 @@
   );
 
   const pageObserver = new MutationObserver(
-    scheduleRenderedScan
+    handlePageMutations
   );
   pageObserver.observe(document.documentElement, {
     childList: true,

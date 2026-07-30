@@ -55,7 +55,11 @@
    * @returns {string}
    */
   function getRouteConversationId() {
-    return location.pathname.match(/^\/c\/([^/]+)/)?.[1] ?? "";
+    return (
+      location.pathname.match(
+        /(?:^|\/)c\/([^/]+)(?:\/|$)/
+      )?.[1] ?? ""
+    );
   }
 
   /**
