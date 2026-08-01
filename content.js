@@ -12,6 +12,7 @@
   ]);
   const LIST_INDENT = "    ";
   const SEND_BUTTON_SELECTOR = "button[data-testid='send-button']";
+  const USER_TURN_SELECTOR = "section[data-turn='user']";
   const PENDING_LIST_EXITS = new WeakMap();
   const REDISPATCHED_EVENTS = new WeakSet();
   const IS_MAC_OS =
@@ -19,7 +20,8 @@
     /Mac/i.test(navigator.platform);
 
   /**
-   * Locate the ChatGPT composer without depending on generated CSS classes.
+   * Locate either the main ChatGPT composer or a user-message edit box
+   * without depending on generated CSS classes or localized labels.
    *
    * @param {KeyboardEvent} event
    * @returns {HTMLElement | null}
@@ -29,17 +31,127 @@
       return null;
     }
 
-    return event.target.closest("#prompt-textarea");
+    const composerEditor =
+      event.target.closest("#prompt-textarea");
+    if (composerEditor instanceof HTMLElement) {
+      return composerEditor;
+    }
+
+    const textarea = event.target.closest("textarea");
+    if (
+      textarea instanceof HTMLTextAreaElement &&
+      textarea.closest(USER_TURN_SELECTOR)
+    ) {
+      return textarea;
+    }
+
+    return null;
   }
 
   /**
-   * Re-dispatch Enter as Shift+Enter so ChatGPT's own editor performs its
-   * native newline action. This avoids mutating ProseMirror's DOM directly.
+   * Return whether an editor currently has a collapsed caret.
+   *
+   * @param {HTMLElement} editor
+   * @returns {boolean}
+   */
+  function hasCollapsedCaret(editor) {
+    if (editor instanceof HTMLTextAreaElement) {
+      return editor.selectionStart === editor.selectionEnd;
+    }
+
+    const selection = window.getSelection();
+    return Boolean(
+      selection &&
+      selection.isCollapsed &&
+      selection.rangeCount > 0 &&
+      editor.contains(selection.anchorNode)
+    );
+  }
+
+  /**
+   * Replace a textarea range while notifying ChatGPT's controlled input.
+   * Calling the prototype setter bypasses React's per-element value tracker,
+   * allowing the subsequent input event to observe the change.
+   *
+   * @param {HTMLTextAreaElement} editor
+   * @param {number} start
+   * @param {number} end
+   * @param {string} text
+   * @param {string} inputType
+   * @param {number} [caretPosition]
+   */
+  function replaceTextareaRange(
+    editor,
+    start,
+    end,
+    text,
+    inputType,
+    caretPosition = start + text.length
+  ) {
+    const nextValue =
+      editor.value.slice(0, start) +
+      text +
+      editor.value.slice(end);
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value"
+    )?.set;
+    const nextCaretPosition = Math.max(
+      0,
+      Math.min(caretPosition, nextValue.length)
+    );
+
+    editor.focus();
+
+    if (valueSetter) {
+      valueSetter.call(editor, nextValue);
+    } else {
+      editor.value = nextValue;
+    }
+
+    editor.setSelectionRange(
+      nextCaretPosition,
+      nextCaretPosition
+    );
+    editor.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        inputType,
+        data:
+          inputType.startsWith("delete") ||
+          inputType === "insertLineBreak"
+            ? null
+            : text
+      })
+    );
+
+    if (editor.isConnected) {
+      editor.setSelectionRange(
+        nextCaretPosition,
+        nextCaretPosition
+      );
+    }
+  }
+
+  /**
+   * Insert a line break using the native behavior for each editor type.
+   * ProseMirror handles a re-dispatched Shift+Enter, while the message-edit
+   * textarea is updated through its controlled-input path.
    *
    * @param {HTMLElement} editor
    * @param {KeyboardEvent} sourceEvent
    */
-  function dispatchNativeLineBreak(editor, sourceEvent) {
+  function insertLineBreak(editor, sourceEvent) {
+    if (editor instanceof HTMLTextAreaElement) {
+      insertTextAtCaret(
+        editor,
+        "\n",
+        "insertLineBreak"
+      );
+      return;
+    }
+
     const shiftEnterEvent = new KeyboardEvent("keydown", {
       key: "Enter",
       code: sourceEvent.code || "Enter",
@@ -101,6 +213,14 @@
    * @returns {string | null}
    */
   function getEditorTextBeforeCaret(editor) {
+    if (editor instanceof HTMLTextAreaElement) {
+      if (!hasCollapsedCaret(editor)) {
+        return null;
+      }
+
+      return editor.value.slice(0, editor.selectionStart);
+    }
+
     const selection = window.getSelection();
 
     if (
@@ -201,12 +321,28 @@
   }
 
   /**
-   * Insert plain text at the current caret and let ProseMirror observe it.
+   * Insert plain text at the current caret and let ChatGPT observe it.
    *
    * @param {HTMLElement} editor
    * @param {string} text
+   * @param {string} [inputType]
    */
-  function insertTextAtCaret(editor, text) {
+  function insertTextAtCaret(
+    editor,
+    text,
+    inputType = "insertText"
+  ) {
+    if (editor instanceof HTMLTextAreaElement) {
+      replaceTextareaRange(
+        editor,
+        editor.selectionStart,
+        editor.selectionEnd,
+        text,
+        inputType
+      );
+      return;
+    }
+
     editor.focus();
 
     if (document.execCommand("insertText", false, text)) {
@@ -231,7 +367,7 @@
       new InputEvent("input", {
         bubbles: true,
         composed: true,
-        inputType: "insertText",
+        inputType,
         data: text
       })
     );
@@ -244,6 +380,22 @@
    * @param {number} characterCount
    */
   function removeTextBeforeCaret(editor, characterCount) {
+    if (editor instanceof HTMLTextAreaElement) {
+      if (!hasCollapsedCaret(editor)) {
+        return;
+      }
+
+      const caretPosition = editor.selectionStart;
+      replaceTextareaRange(
+        editor,
+        Math.max(0, caretPosition - characterCount),
+        caretPosition,
+        "",
+        "deleteContentBackward"
+      );
+      return;
+    }
+
     const selection = window.getSelection();
     if (
       !selection ||
@@ -448,6 +600,35 @@
     oldPrefix,
     newPrefix
   ) {
+    if (editor instanceof HTMLTextAreaElement) {
+      if (!hasCollapsedCaret(editor)) {
+        return false;
+      }
+
+      const caretPosition = editor.selectionStart;
+      const lineStart = caretPosition - currentLine.length;
+      const prefixEnd = lineStart + oldPrefix.length;
+
+      if (
+        lineStart < 0 ||
+        editor.value.slice(lineStart, prefixEnd) !== oldPrefix
+      ) {
+        return false;
+      }
+
+      const contentOffset =
+        currentLine.length - oldPrefix.length;
+      replaceTextareaRange(
+        editor,
+        lineStart,
+        prefixEnd,
+        newPrefix,
+        "insertText",
+        lineStart + newPrefix.length + contentOffset
+      );
+      return true;
+    }
+
     const selection = window.getSelection();
     if (
       !selection ||
@@ -508,14 +689,10 @@
     const currentLine = getCurrentLineBeforeCaret(editor);
     const listItem =
       currentLine === null ? null : parseListItem(currentLine);
-    const selection = window.getSelection();
 
     if (
       !listItem ||
-      !selection ||
-      !selection.isCollapsed ||
-      selection.rangeCount === 0 ||
-      typeof selection.modify !== "function"
+      !hasCollapsedCaret(editor)
     ) {
       return false;
     }
@@ -547,14 +724,10 @@
     const currentLine = getCurrentLineBeforeCaret(editor);
     const listItem =
       currentLine === null ? null : parseListItem(currentLine);
-    const selection = window.getSelection();
 
     if (
       !listItem ||
-      !selection ||
-      !selection.isCollapsed ||
-      selection.rangeCount === 0 ||
-      typeof selection.modify !== "function"
+      !hasCollapsedCaret(editor)
     ) {
       return false;
     }
@@ -701,9 +874,48 @@
     }
 
     PENDING_LIST_EXITS.delete(editor);
-    dispatchNativeLineBreak(editor, sourceEvent);
-    insertTextAtCaret(editor, listItem.nextPrefix);
+    if (editor instanceof HTMLTextAreaElement) {
+      insertTextAtCaret(
+        editor,
+        "\n" + listItem.nextPrefix
+      );
+    } else {
+      insertLineBreak(editor, sourceEvent);
+      insertTextAtCaret(editor, listItem.nextPrefix);
+    }
     return true;
+  }
+
+  /**
+   * Find the submit button paired with a user-message edit textarea.
+   * ChatGPT does not expose a test id for this button, so walk outward from
+   * the textarea until its adjacent two-button action group is found.
+   *
+   * @param {HTMLTextAreaElement} editor
+   * @returns {HTMLButtonElement | null}
+   */
+  function findEditMessageSendButton(editor) {
+    const turn = editor.closest(USER_TURN_SELECTOR);
+    if (!turn) {
+      return null;
+    }
+
+    let editorContainer = editor.parentElement;
+
+    while (editorContainer && editorContainer !== turn) {
+      const actionGroup = editorContainer.nextElementSibling;
+      const buttons = [...(actionGroup?.children ?? [])].filter(
+        child => child instanceof HTMLButtonElement
+      );
+
+      if (buttons.length === 2) {
+        return buttons.at(-1) ?? null;
+      }
+
+      editorContainer = editorContainer.parentElement;
+    }
+
+    return null;
   }
 
   /**
@@ -712,8 +924,11 @@
    * @param {HTMLElement} editor
    */
   function sendMessage(editor) {
-    const form = editor.closest("form");
-    const sendButton = form?.querySelector(SEND_BUTTON_SELECTOR);
+    const sendButton = editor instanceof HTMLTextAreaElement
+      ? findEditMessageSendButton(editor)
+      : editor
+        .closest("form")
+        ?.querySelector(SEND_BUTTON_SELECTOR);
 
     if (
       !(sendButton instanceof HTMLButtonElement) ||
@@ -830,7 +1045,7 @@
       return;
     }
 
-    dispatchNativeLineBreak(editor, event);
+    insertLineBreak(editor, event);
   }
 
   document.addEventListener("input", handleEditorInput, true);
